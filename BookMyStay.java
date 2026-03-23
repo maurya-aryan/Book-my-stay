@@ -1,106 +1,141 @@
+import java.util.*;
+
 /**
- * Book My Stay Application - Use Case 2
- * This program demonstrates room types using abstraction, inheritance,
- * polymorphism, and static availability representation.
+ * Book My Stay Application - Use Case 9
+ * Demonstrates error handling and validation using custom exceptions.
  *
  * @author YourName
- * @version 2.0
+ * @version 9.0
  */
 
-// Abstract Class
-abstract class Room {
-    protected String roomType;
-    protected int beds;
-    protected double price;
+// ---------- Custom Exception ----------
+class InvalidBookingException extends Exception {
+    public InvalidBookingException(String message) {
+        super(message);
+    }
+}
 
-    // Constructor
-    public Room(String roomType, int beds, double price) {
+// ---------- Reservation ----------
+class Reservation {
+    private String guestName;
+    private String roomType;
+
+    public Reservation(String guestName, String roomType) {
+        this.guestName = guestName;
         this.roomType = roomType;
-        this.beds = beds;
-        this.price = price;
     }
 
-    // Abstract method
-    public abstract void displayDetails();
-}
-
-// Single Room Class
-class SingleRoom extends Room {
-
-    public SingleRoom() {
-        super("Single Room", 1, 2000.0);
+    public String getGuestName() {
+        return guestName;
     }
 
-    @Override
-    public void displayDetails() {
-        System.out.println("Room Type : " + roomType);
-        System.out.println("Beds      : " + beds);
-        System.out.println("Price     : ₹" + price);
+    public String getRoomType() {
+        return roomType;
     }
 }
 
-// Double Room Class
-class DoubleRoom extends Room {
+// ---------- Inventory ----------
+class RoomInventory {
+    private Map<String, Integer> inventory = new HashMap<>();
 
-    public DoubleRoom() {
-        super("Double Room", 2, 3500.0);
+    public RoomInventory() {
+        inventory.put("Single Room", 2);
+        inventory.put("Double Room", 1);
+        inventory.put("Suite Room", 0);
     }
 
-    @Override
-    public void displayDetails() {
-        System.out.println("Room Type : " + roomType);
-        System.out.println("Beds      : " + beds);
-        System.out.println("Price     : ₹" + price);
+    public int getAvailability(String roomType) {
+        return inventory.getOrDefault(roomType, -1);
+    }
+
+    public void reduceAvailability(String roomType) throws InvalidBookingException {
+        int current = getAvailability(roomType);
+
+        if (current <= 0) {
+            throw new InvalidBookingException("No rooms available for " + roomType);
+        }
+
+        inventory.put(roomType, current - 1);
+    }
+
+    public boolean isValidRoomType(String roomType) {
+        return inventory.containsKey(roomType);
     }
 }
 
-// Suite Room Class
-class SuiteRoom extends Room {
+// ---------- Validator ----------
+class BookingValidator {
 
-    public SuiteRoom() {
-        super("Suite Room", 3, 6000.0);
-    }
+    public void validate(Reservation r, RoomInventory inventory) throws InvalidBookingException {
 
-    @Override
-    public void displayDetails() {
-        System.out.println("Room Type : " + roomType);
-        System.out.println("Beds      : " + beds);
-        System.out.println("Price     : ₹" + price);
+        // Validate guest name
+        if (r.getGuestName() == null || r.getGuestName().isEmpty()) {
+            throw new InvalidBookingException("Guest name cannot be empty.");
+        }
+
+        // Validate room type
+        if (!inventory.isValidRoomType(r.getRoomType())) {
+            throw new InvalidBookingException("Invalid room type: " + r.getRoomType());
+        }
+
+        // Validate availability
+        if (inventory.getAvailability(r.getRoomType()) <= 0) {
+            throw new InvalidBookingException("Room not available: " + r.getRoomType());
+        }
     }
 }
 
-// Main Class
-public class BookMyStay {
+// ---------- Booking Service ----------
+class BookingService {
+
+    public void confirmBooking(Reservation r, RoomInventory inventory) {
+
+        BookingValidator validator = new BookingValidator();
+
+        try {
+            // Validation (Fail Fast)
+            validator.validate(r, inventory);
+
+            // If valid → allocate
+            inventory.reduceAvailability(r.getRoomType());
+
+            System.out.println("\nBooking Confirmed!");
+            System.out.println("Guest: " + r.getGuestName());
+            System.out.println("Room: " + r.getRoomType());
+
+        } catch (InvalidBookingException e) {
+            // Graceful failure
+            System.out.println("\nBooking Failed: " + e.getMessage());
+        }
+    }
+}
+
+// ---------- Main ----------
+public class UseCase9ErrorHandlingValidation {
 
     public static void main(String[] args) {
 
         System.out.println("===================================");
-        System.out.println("     Book My Stay App - v2.0       ");
+        System.out.println("   Book My Stay App - v9.0         ");
         System.out.println("===================================\n");
 
-        // Polymorphism (reference type = Room)
-        Room single = new SingleRoom();
-        Room doubleRoom = new DoubleRoom();
-        Room suite = new SuiteRoom();
+        RoomInventory inventory = new RoomInventory();
+        BookingService service = new BookingService();
 
-        // Static availability variables
-        int singleAvailable = 5;
-        int doubleAvailable = 3;
-        int suiteAvailable = 2;
+        // Test cases
 
-        // Display details
-        System.out.println("---- Single Room ----");
-        single.displayDetails();
-        System.out.println("Available Rooms: " + singleAvailable);
+        // Valid booking
+        service.confirmBooking(new Reservation("Amit", "Single Room"), inventory);
 
-        System.out.println("\n---- Double Room ----");
-        doubleRoom.displayDetails();
-        System.out.println("Available Rooms: " + doubleAvailable);
+        // Invalid room type
+        service.confirmBooking(new Reservation("Rahul", "Luxury Room"), inventory);
 
-        System.out.println("\n---- Suite Room ----");
-        suite.displayDetails();
-        System.out.println("Available Rooms: " + suiteAvailable);
+        // No availability
+        service.confirmBooking(new Reservation("Sneha", "Suite Room"), inventory);
 
-        System.out.println("\nApplication Executed Successfully!");
+        // Empty name
+        service.confirmBooking(new Reservation("", "Double Room"), inventory);
+
+        System.out.println("\nSystem running safely after errors.");
     }
 }
