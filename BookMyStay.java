@@ -1,15 +1,14 @@
-import java.util.LinkedList;
-import java.util.Queue;
+import java.util.*;
 
 /**
- * Book My Stay Application - Use Case 5
- * Demonstrates booking request handling using Queue (FIFO).
+ * Book My Stay Application - Use Case 6
+ * Demonstrates reservation confirmation and safe room allocation.
  *
  * @author YourName
- * @version 5.0
+ * @version 6.0
  */
 
-// ---------- Reservation Class ----------
+// ---------- Reservation ----------
 class Reservation {
     private String guestName;
     private String roomType;
@@ -26,68 +25,124 @@ class Reservation {
     public String getRoomType() {
         return roomType;
     }
-
-    public void displayReservation() {
-        System.out.println("Guest: " + guestName + " | Room Type: " + roomType);
-    }
 }
 
 // ---------- Booking Queue ----------
 class BookingRequestQueue {
+    private Queue<Reservation> queue = new LinkedList<>();
 
-    private Queue<Reservation> queue;
-
-    public BookingRequestQueue() {
-        queue = new LinkedList<>();
+    public void addRequest(Reservation r) {
+        queue.offer(r);
     }
 
-    // Add request to queue
-    public void addRequest(Reservation reservation) {
-        queue.offer(reservation);
-        System.out.println("Request Added: " + reservation.getGuestName());
+    public Reservation getNextRequest() {
+        return queue.poll(); // FIFO
     }
 
-    // Display all requests
-    public void displayQueue() {
-        System.out.println("\n----- Booking Request Queue (FIFO) -----");
-
-        if (queue.isEmpty()) {
-            System.out.println("No booking requests.");
-            return;
-        }
-
-        for (Reservation r : queue) {
-            r.displayReservation();
-        }
+    public boolean isEmpty() {
+        return queue.isEmpty();
     }
 }
 
-// ---------- Main Class ----------
-public class UseCase5BookingRequestQueue {
+// ---------- Inventory ----------
+class RoomInventory {
+    private Map<String, Integer> inventory = new HashMap<>();
+
+    public RoomInventory() {
+        inventory.put("Single Room", 2);
+        inventory.put("Double Room", 1);
+        inventory.put("Suite Room", 1);
+    }
+
+    public int getAvailability(String roomType) {
+        return inventory.getOrDefault(roomType, 0);
+    }
+
+    public void reduceAvailability(String roomType) {
+        inventory.put(roomType, inventory.get(roomType) - 1);
+    }
+}
+
+// ---------- Booking Service ----------
+class BookingService {
+
+    // Track allocated room IDs
+    private Set<String> allocatedRoomIds = new HashSet<>();
+
+    // Map room type → allocated IDs
+    private Map<String, Set<String>> roomAllocations = new HashMap<>();
+
+    public void processBookings(BookingRequestQueue queue, RoomInventory inventory) {
+
+        while (!queue.isEmpty()) {
+
+            Reservation r = queue.getNextRequest();
+            String roomType = r.getRoomType();
+
+            System.out.println("\nProcessing booking for: " + r.getGuestName());
+
+            // Check availability
+            if (inventory.getAvailability(roomType) > 0) {
+
+                // Generate unique room ID
+                String roomId = generateRoomId(roomType);
+
+                // Ensure uniqueness
+                while (allocatedRoomIds.contains(roomId)) {
+                    roomId = generateRoomId(roomType);
+                }
+
+                // Store in set
+                allocatedRoomIds.add(roomId);
+
+                // Map room type → room IDs
+                roomAllocations.putIfAbsent(roomType, new HashSet<>());
+                roomAllocations.get(roomType).add(roomId);
+
+                // Update inventory
+                inventory.reduceAvailability(roomType);
+
+                // Confirm booking
+                System.out.println("Booking Confirmed!");
+                System.out.println("Guest: " + r.getGuestName());
+                System.out.println("Room Type: " + roomType);
+                System.out.println("Allocated Room ID: " + roomId);
+
+            } else {
+                System.out.println("Booking Failed! No rooms available for " + roomType);
+            }
+        }
+    }
+
+    // Generate room ID
+    private String generateRoomId(String roomType) {
+        return roomType.substring(0, 2).toUpperCase() + "-" + (int)(Math.random() * 1000);
+    }
+}
+
+// ---------- Main ----------
+public class UseCase6RoomAllocationService {
 
     public static void main(String[] args) {
 
         System.out.println("===================================");
-        System.out.println("   Book My Stay App - v5.0         ");
+        System.out.println("   Book My Stay App - v6.0         ");
         System.out.println("===================================\n");
 
-        // Initialize queue
-        BookingRequestQueue bookingQueue = new BookingRequestQueue();
+        // Initialize components
+        BookingRequestQueue queue = new BookingRequestQueue();
+        RoomInventory inventory = new RoomInventory();
+        BookingService service = new BookingService();
 
-        // Simulate booking requests
-        Reservation r1 = new Reservation("Amit", "Single Room");
-        Reservation r2 = new Reservation("Rahul", "Double Room");
-        Reservation r3 = new Reservation("Sneha", "Suite Room");
+        // Add booking requests
+        queue.addRequest(new Reservation("Amit", "Single Room"));
+        queue.addRequest(new Reservation("Rahul", "Single Room"));
+        queue.addRequest(new Reservation("Sneha", "Single Room")); // may fail
+        queue.addRequest(new Reservation("Priya", "Suite Room"));
 
-        // Add requests (FIFO order)
-        bookingQueue.addRequest(r1);
-        bookingQueue.addRequest(r2);
-        bookingQueue.addRequest(r3);
+        // Process bookings
+        service.processBookings(queue, inventory);
 
-        // Display queue
-        bookingQueue.displayQueue();
-
-        System.out.println("\nAll requests stored in FIFO order.");
-        System.out.println("No inventory changes made at this stage.");
+        System.out.println("\nAll bookings processed.");
     }
 }
